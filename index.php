@@ -14,11 +14,14 @@ $result = $conn->query($sql);
 
 <h2>Products</h2>
 
+<div style="display:flex; flex-wrap:wrap;">
+
 <?php
 if ($result->num_rows > 0) {
     while($row = $result->fetch_assoc()) {
-        echo "<div>";
+        echo "<div style='border:1px solid #ccc; padding:10px; margin:10px; width:200px;'>";
         echo "<h3>" . $row['name'] . "</h3>";
+        echo "<img src='images/" . $row['image'] . "' width='150'><br>";
         echo "<p>Price: KES " . $row['price'] . "</p>";
         echo "</div>";
     }
@@ -26,6 +29,8 @@ if ($result->num_rows > 0) {
     echo "No products found";
 }
 ?>
+
+</div>
 
 </body>
 </html>
