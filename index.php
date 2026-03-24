@@ -1,5 +1,26 @@
 <?php
+session_start();
 require 'db.php';
+
+$sql = "SELECT * FROM products";
+$result = $conn->query($sql);
+?>
+
+<?php
+require 'db.php';
+
+if(isset($_POST['add_to_cart'])) {
+
+    $product_id = $_POST['product_id'];
+    $product_name = $_POST['product_name'];
+
+    $_SESSION['cart'][] = [
+        'id' => $product_id,
+        'name' => $product_name
+    ];
+
+    echo "Product added to cart!";
+}
 
 $sql = "SELECT * FROM products";
 $result = $conn->query($sql);
@@ -23,6 +44,12 @@ if ($result->num_rows > 0) {
         echo "<h3>" . $row['name'] . "</h3>";
         echo "<img src='images/" . $row['image'] . "' width='150'><br>";
         echo "<p>Price: KES " . $row['price'] . "</p>";
+
+echo "<form method='POST' action=''>
+        <input type='hidden' name='product_id' value='" . $row['id'] . "'>
+        <input type='hidden' name='product_name' value='" . $row['name'] . "'>
+        <button type='submit' name='add_to_cart'>Add to Cart</button>
+      </form>";
         echo "</div>";
     }
 } else {
