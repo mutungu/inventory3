@@ -2,26 +2,28 @@
 session_start();
 require 'db.php';
 
-$sql = "SELECT * FROM products";
-$result = $conn->query($sql);
-?>
-
-<?php
-require 'db.php';
-
+// Handle Add to Cart FIRST (before any HTML)
 if(isset($_POST['add_to_cart'])) {
 
     $product_id = $_POST['product_id'];
     $product_name = $_POST['product_name'];
+
+    // Initialize cart if not set
+    if(!isset($_SESSION['cart'])) {
+        $_SESSION['cart'] = [];
+    }
 
     $_SESSION['cart'][] = [
         'id' => $product_id,
         'name' => $product_name
     ];
 
-    echo "Product added to cart!";
+    // Redirect (VERY IMPORTANT)
+    header("Location: index.php");
+    exit();
 }
 
+// Fetch products
 $sql = "SELECT * FROM products";
 $result = $conn->query($sql);
 ?>
@@ -34,6 +36,7 @@ $result = $conn->query($sql);
 <body>
 
 <h2>Products</h2>
+<a href="cart.php">View Cart</a>
 
 <div style="display:flex; flex-wrap:wrap;">
 
@@ -45,11 +48,12 @@ if ($result->num_rows > 0) {
         echo "<img src='images/" . $row['image'] . "' width='150'><br>";
         echo "<p>Price: KES " . $row['price'] . "</p>";
 
-echo "<form method='POST' action=''>
-        <input type='hidden' name='product_id' value='" . $row['id'] . "'>
-        <input type='hidden' name='product_name' value='" . $row['name'] . "'>
-        <button type='submit' name='add_to_cart'>Add to Cart</button>
-      </form>";
+        echo "<form method='POST'>
+                <input type='hidden' name='product_id' value='" . $row['id'] . "'>
+                <input type='hidden' name='product_name' value='" . $row['name'] . "'>
+                <button type='submit' name='add_to_cart'>Add to Cart</button>
+              </form>";
+
         echo "</div>";
     }
 } else {
