@@ -24,18 +24,25 @@ if(isset($_POST['remove'])) {
 <h2>Your Cart</h2>
 
 <?php
+$total = 0;
+
 if(isset($_SESSION['cart']) && count($_SESSION['cart']) > 0) {
 
     foreach($_SESSION['cart'] as $index => $item) {
-        echo "<p>" . $item['name'] . "
-        
-        <form method='POST' style='display:inline;'>
-            <input type='hidden' name='index' value='$index'>
-            <button type='submit' name='remove'>Remove</button>
-        </form>
-        
-        </p>";
+
+        $total += $item['price'];
+
+        echo "<p>
+                " . $item['name'] . " - KES " . $item['price'] . "
+                
+                <form method='POST' style='display:inline;'>
+                    <input type='hidden' name='index' value='$index'>
+                    <button type='submit' name='remove'>Remove</button>
+                </form>
+              </p>";
     }
+
+    echo "<h3>Total: KES " . $total . "</h3>";
 
 } else {
     echo "Your cart is empty";
