@@ -209,6 +209,27 @@ body {
     gap:12px;
     flex-wrap:wrap;
 }
+.topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.about-link {
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.8);
+    text-decoration: none;
+    font-size: 13px;
+    transition: all 180ms ease;
+}
+.about-link:hover {
+    color: #111;
+    background: var(--gold);
+    border-color: var(--gold);
+    box-shadow: 0 8px 18px rgba(242,184,75,0.25);
+}
 
 .hero {
     padding: 24px;
@@ -442,6 +463,7 @@ button {
 
     <a href="index.php">Dashboard</a>
     <a href="index.php">Products</a>
+    <a href="about.php">About</a>
     <a href="#quick-order">Place Order</a>
 
     <hr>
@@ -459,7 +481,10 @@ button {
 <div class="main">
 
 <div class="topbar">
-    <h2><?= $category ?: "All Products" ?></h2>
+    <div class="topbar-left">
+        <a class="about-link" href="about.php">About</a>
+        <h2><?= $category ?: "" ?></h2>
+    </div>
 
     <form method="GET" class="search-box">
         <div class="filter-box">
