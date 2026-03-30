@@ -370,6 +370,12 @@ button {
     background: rgba(255,255,255,0.06);
     transition: all 180ms ease;
 }
+.footer .social img {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    filter: brightness(1.2) contrast(1.1);
+}
 .footer .social a:hover {
     border-color: var(--gold);
     box-shadow: 0 8px 18px rgba(242,184,75,0.25);
@@ -517,16 +523,13 @@ button {
             <h4>Social</h4>
             <div class="social">
                 <a href="https://www.instagram.com" aria-label="Instagram" title="Instagram">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <rect x="2.5" y="2.5" width="19" height="19" rx="5"></rect>
-                        <circle cx="12" cy="12" r="4"></circle>
-                        <circle cx="17.5" cy="6.5" r="1"></circle>
-                    </svg>
+                    <img src="images/instagram.png" alt="Instagram">
                 </a>
                 <a href="https://www.facebook.com" aria-label="Facebook" title="Facebook">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="white" aria-hidden="true">
-                        <path d="M13.5 9H16V6h-2.5c-2 0-3.5 1.5-3.5 3.5V12H7v3h2.9v6H13v-6h2.6l.4-3H13V9.5c0-.3.2-.5.5-.5Z"/>
-                    </svg>
+                    <img src="images/facebook.png" alt="Facebook">
+                </a>
+                <a href="https://www.twitter.com" aria-label="Twitter" title="Twitter">
+                    <img src="images/twitter.png" alt="Twitter">
                 </a>
             </div>
         </div>

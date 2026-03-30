@@ -29,40 +29,89 @@ if(isset($_POST['remove'])) {
 <title>Your Cart</title>
 
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;600;700&display=swap');
+
 body {
-    font-family: Arial;
-    background: #f5f5f5;
+    margin: 0;
+    font-family: 'Manrope', Arial, sans-serif;
+    background: #0b0b0b;
+    color: #f5f5f5;
+    overflow-x: hidden;
+}
+
+.video-bg {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    z-index: -2;
+    background: #0b0b0b;
+    filter: saturate(1) brightness(0.9);
+}
+.video-overlay {
+    position: fixed;
+    inset: 0;
+    background:
+        radial-gradient(1000px 500px at 12% 10%, rgba(255,255,255,0.08), transparent 60%),
+        radial-gradient(900px 700px at 85% 20%, rgba(242,184,75,0.16), transparent 65%),
+        linear-gradient(180deg, rgba(0,0,0,0.55), rgba(0,0,0,0.8));
+    z-index: -1;
 }
 
 .container {
-    width: 80%;
-    margin: auto;
+    width: min(920px, 88%);
+    margin: 28px auto 40px;
 }
 
-.cart-item {
-    background: white;
-    padding: 15px;
-    margin: 10px 0;
-    border-radius: 10px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+.page-header {
     display: flex;
-    gap: 15px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+.page-header a {
+    color: rgba(255,255,255,0.75);
+    text-decoration: none;
+}
+.page-header a:hover { color: #f2b84b; }
+
+.cart-grid {
+    display: grid;
+    gap: 14px;
+}
+.cart-item {
+    background: rgba(24,24,24,0.85);
+    padding: 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 16px 32px rgba(0,0,0,0.35);
+    display: grid;
+    grid-template-columns: 90px 1fr auto;
+    gap: 12px;
     align-items: center;
 }
 .cart-img {
     width: 90px;
     height: 90px;
-    border-radius: 10px;
+    border-radius: 12px;
     object-fit: cover;
-    background: #eee;
+    background: rgba(255,255,255,0.08);
 }
 .cart-content {
     flex: 1;
 }
 
 button {
-    padding: 5px 10px;
-    margin: 5px;
+    padding: 6px 10px;
+    margin: 4px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.06);
+    color: #f5f5f5;
+    cursor: pointer;
 }
 
 .total {
@@ -70,24 +119,80 @@ button {
     font-weight: bold;
 }
 
+.qty {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 6px 0;
+}
+.qty strong { min-width: 24px; text-align: center; }
+.remove-btn {
+    background: rgba(185,28,28,0.85);
+    border-color: rgba(185,28,28,0.6);
+    color: #fff;
+}
+.summary {
+    margin-top: 18px;
+    padding: 12px;
+    border-radius: 14px;
+    background: rgba(18,18,18,0.9);
+    border: 1px solid rgba(255,255,255,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.checkout-btn {
+    padding: 10px 16px;
+    background: #f2b84b;
+    color: #111;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    box-shadow: 0 10px 18px rgba(200,161,101,0.25);
+}
+
+@media (max-width: 720px) {
+    .cart-item {
+        grid-template-columns: 1fr;
+        justify-items: start;
+    }
+    .cart-img {
+        width: 100%;
+        height: 160px;
+    }
+    .summary {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
 </style>
 
 </head>
 <body>
 
+<video class="video-bg" autoplay muted loop playsinline>
+    <source src="videos/cart2.mp4" type="video/mp4">
+</video>
+<div class="video-overlay"></div>
+
 <div class="container">
 
-<h2>🛒 Your Cart</h2>
-
-<a href="index.php">← Continue Shopping</a>
+<div class="page-header">
+    <h2>Your Cart</h2>
+    <a href="index.php">Continue Shopping</a>
+</div>
 
 <?php
 $total = 0;
 
 if(isset($_SESSION['cart']) && count($_SESSION['cart']) > 0):
+?>
+<div class="cart-grid">
+<?php foreach($_SESSION['cart'] as $index => $item): ?>
 
-foreach($_SESSION['cart'] as $index => $item):
-
+<?php
 $subtotal = $item['price'] * $item['quantity'];
 $total += $subtotal;
 ?>
@@ -103,42 +208,53 @@ $total += $subtotal;
         <h3><?= $item['name'] ?></h3>
         <p>Price: KES <?= $item['price'] ?></p>
 
-    <form method="POST" style="display:inline;">
-        <input type="hidden" name="index" value="<?= $index ?>">
-        <button name="decrease">−</button>
-    </form>
+        <div class="qty">
+            <form method="POST" style="display:inline;">
+                <input type="hidden" name="index" value="<?= $index ?>">
+                <button name="decrease">-</button>
+            </form>
 
-    <strong><?= $item['quantity'] ?></strong>
+            <strong><?= $item['quantity'] ?></strong>
 
-    <form method="POST" style="display:inline;">
-        <input type="hidden" name="index" value="<?= $index ?>">
-        <button name="increase">+</button>
-    </form>
+            <form method="POST" style="display:inline;">
+                <input type="hidden" name="index" value="<?= $index ?>">
+                <button name="increase">+</button>
+            </form>
+        </div>
 
-    <p>Subtotal: KES <?= $subtotal ?></p>
-
+        <p>Subtotal: KES <?= $subtotal ?></p>
+    </div>
+    <div>
         <form method="POST">
             <input type="hidden" name="index" value="<?= $index ?>">
-            <button name="remove" style="background:red; color:white;">Remove</button>
+            <button class="remove-btn" name="remove">Remove</button>
         </form>
     </div>
 </div>
 
 <?php endforeach; ?>
+</div>
 
-<p class="total">Total: KES <?= $total ?></p>
+<div class="summary">
+    <div class="total">Total: KES <?= $total ?></div>
+    <a href="checkout.php">
+        <button class="checkout-btn">Proceed to Checkout</button>
+    </a>
+</div>
 
 <?php else: ?>
 <p>Your cart is empty</p>
 <?php endif; ?>
 
-
 </div>
-<a href="checkout.php">
-    <button style="padding:10px; background:blue; color:white;">
-        Proceed to Checkout
-    </button>
-</a>
+
+<script>
+    const bgVideo = document.querySelector('.video-bg');
+    if (bgVideo) {
+        bgVideo.playbackRate = 0.8;
+    }
+</script>
 
 </body>
 </html>
+
