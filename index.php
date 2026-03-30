@@ -147,18 +147,22 @@ if($show_notice){
 body {
     margin:0;
     font-family:'Manrope', sans-serif;
-    display:flex;
     color: var(--ink);
     background:
         radial-gradient(1000px 500px at 12% 10%, rgba(255,255,255,0.04), transparent 60%),
         radial-gradient(900px 700px at 85% 20%, rgba(242,184,75,0.08), transparent 65%),
         linear-gradient(180deg, var(--stone), var(--cream));
 }
+.layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    min-height: 100vh;
+}
 
 /* SIDEBAR */
 .sidebar {
     width:260px;
-    height:100vh;
+    height:100%;
     background: var(--deep);
     color: #f5efe4;
     padding:26px 22px;
@@ -326,7 +330,7 @@ button {
     animation-delay: 1s;
 }
 .footer {
-    margin-top: 28px;
+    margin: 0;
     padding: 24px;
     border-radius: 18px;
     background: rgba(18,18,18,0.9);
@@ -335,6 +339,9 @@ button {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 16px;
+}
+.page-footer {
+    padding: 0 0 32px 0;
 }
 .footer h4 {
     margin: 0 0 8px 0;
@@ -345,6 +352,27 @@ button {
     text-decoration: none;
     display: inline-block;
     margin: 4px 0;
+}
+.footer .social {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-top: 6px;
+}
+.footer .social a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.06);
+    transition: all 180ms ease;
+}
+.footer .social a:hover {
+    border-color: var(--gold);
+    box-shadow: 0 8px 18px rgba(242,184,75,0.25);
 }
 .footer a:hover {
     color: var(--gold-dark);
@@ -402,6 +430,7 @@ button {
 </head>
 <body>
 
+<div class="layout">
 <div class="sidebar">
     <h2>🛒 MyShop</h2>
 
@@ -467,33 +496,47 @@ button {
 
 </div>
 
-<div class="footer">
-    <div>
-        <h4>Contact</h4>
-        <div class="brand">Email: support@myshop.com</div>
-        <div class="brand">Phone: +254 700 000 000</div>
-        <div class="brand">Nairobi, Kenya</div>
-    </div>
-    <div>
-        <h4>Shop</h4>
-        <a href="index.php">Products</a><br>
-        <a href="cart.php">Cart</a><br>
-        <a href="orders.php">Orders</a>
-    </div>
-    <div>
-        <h4>Company</h4>
-        <a href="#">About</a><br>
-        <a href="#">Sourcing</a><br>
-        <a href="#">Careers</a>
-    </div>
-    <div>
-        <h4>Legal</h4>
-        <a href="#">Privacy Policy</a><br>
-        <a href="#">Terms</a><br>
-        <a href="#">Returns</a>
-    </div>
+</div>
 </div>
 
+<div class="page-footer">
+    <div class="footer">
+        <div>
+            <h4>Contact</h4>
+            <div class="brand">Email: support@myshop.com</div>
+            <div class="brand">Phone: +254 700 000 000</div>
+            <div class="brand">Nairobi, Kenya</div>
+        </div>
+        <div>
+            <h4>Company</h4>
+            <a href="#">About</a><br>
+            <a href="#">Sourcing</a><br>
+            <a href="#">Careers</a>
+        </div>
+        <div>
+            <h4>Social</h4>
+            <div class="social">
+                <a href="https://www.instagram.com" aria-label="Instagram" title="Instagram">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="2.5" y="2.5" width="19" height="19" rx="5"></rect>
+                        <circle cx="12" cy="12" r="4"></circle>
+                        <circle cx="17.5" cy="6.5" r="1"></circle>
+                    </svg>
+                </a>
+                <a href="https://www.facebook.com" aria-label="Facebook" title="Facebook">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="white" aria-hidden="true">
+                        <path d="M13.5 9H16V6h-2.5c-2 0-3.5 1.5-3.5 3.5V12H7v3h2.9v6H13v-6h2.6l.4-3H13V9.5c0-.3.2-.5.5-.5Z"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+        <div>
+            <h4>Legal</h4>
+            <a href="#">Privacy Policy</a><br>
+            <a href="#">Terms</a><br>
+            <a href="#">Returns</a>
+        </div>
+    </div>
 </div>
 
 <div class="modal-backdrop" id="cartModal">
