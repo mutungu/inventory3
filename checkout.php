@@ -164,6 +164,7 @@ button {
 <div class="card">
     <h2>Checkout</h2>
     <div class="actions">
+        <a href="index.php">Back to Home</a>
         <a href="cart.php">Back to Cart</a>
         <a href="orders.php">Orders</a>
     </div>

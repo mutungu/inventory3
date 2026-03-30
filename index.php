@@ -9,6 +9,42 @@ if(!isset($_SESSION['user'])){
 
 $category = $_GET['category'] ?? '';
 $search = $_GET['search'] ?? '';
+ 
+// Quick order (dropdown)
+if(isset($_POST['quick_order'])){
+    $pid = (int)($_POST['product_id'] ?? 0);
+    $qty = (int)($_POST['quantity'] ?? 1);
+    if($qty < 1) $qty = 1;
+
+    $stmt = $conn->prepare("SELECT id, name, price, image FROM products WHERE id=?");
+    $stmt->bind_param("i", $pid);
+    $stmt->execute();
+    $p = $stmt->get_result()->fetch_assoc();
+
+    if($p){
+        if(!isset($_SESSION['cart'])) $_SESSION['cart']=[];
+        $found=false;
+        foreach($_SESSION['cart'] as &$item){
+            if($item['id']==$p['id']){
+                $item['quantity'] += $qty;
+                $found=true;
+                break;
+            }
+        }
+        if(!$found){
+            $_SESSION['cart'][]=[
+                'id'=>$p['id'],
+                'name'=>$p['name'],
+                'price'=>$p['price'],
+                'image'=>$p['image'] ?? '',
+                'quantity'=>$qty
+            ];
+        }
+        $_SESSION['cart_notice'] = 1;
+        header("Location: cart.php");
+        exit();
+    }
+}
 
 // ADD TO CART
 if(isset($_POST['add_to_cart'])){
@@ -70,6 +106,18 @@ if($params){
 $stmt->execute();
 $result = $stmt->get_result();
 
+// Categories for dropdown
+$categoryOptions = [];
+$catResult = $conn->query("SELECT DISTINCT category FROM products WHERE category IS NOT NULL AND category <> '' ORDER BY category");
+if($catResult){
+    while($c = $catResult->fetch_assoc()){
+        $categoryOptions[] = $c['category'];
+    }
+}
+
+// Products for quick order dropdown
+$quickProducts = $conn->query("SELECT id, name, price FROM products ORDER BY name");
+
 $show_notice = isset($_SESSION['cart_notice']);
 if($show_notice){
     unset($_SESSION['cart_notice']);
@@ -82,44 +130,70 @@ if($show_notice){
 <title>Dashboard</title>
 
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;600;700&family=Playfair+Display:wght@500;600;700&display=swap');
+
+:root {
+    --ink: #f5f5f5;
+    --stone: #0b0b0b;
+    --cream: #0f0f0f;
+    --gold: #f2b84b;
+    --gold-dark: #d79a2b;
+    --deep: #0d0d0d;
+    --muted: #b3b3b3;
+    --card: rgba(24,24,24,0.85);
+    --border: rgba(255,255,255,0.08);
+    --glow: rgba(242,184,75,0.18);
+}
 body {
     margin:0;
-    font-family:'Segoe UI', sans-serif;
+    font-family:'Manrope', sans-serif;
     display:flex;
+    color: var(--ink);
+    background:
+        radial-gradient(1000px 500px at 12% 10%, rgba(255,255,255,0.04), transparent 60%),
+        radial-gradient(900px 700px at 85% 20%, rgba(242,184,75,0.08), transparent 65%),
+        linear-gradient(180deg, var(--stone), var(--cream));
 }
 
 /* SIDEBAR */
 .sidebar {
-    width:240px;
+    width:260px;
     height:100vh;
-    background:#111827;
-    color:white;
-    padding:20px;
+    background: var(--deep);
+    color: #f5efe4;
+    padding:26px 22px;
+    position: sticky;
+    top: 0;
 }
 
 .sidebar h2 {
     margin-bottom:20px;
+    font-family:'Playfair Display', serif;
+    font-weight:600;
+    letter-spacing:0.5px;
 }
 
 .sidebar a {
     display:block;
     padding:12px;
     margin:6px 0;
-    color:#d1d5db;
+    color:rgba(255,255,255,0.78);
     text-decoration:none;
-    border-radius:6px;
+    border-radius:10px;
+    border:1px solid transparent;
+    transition: all 180ms ease;
 }
 
 .sidebar a:hover {
-    background:#1f2937;
-    color:white;
+    background: rgba(255,255,255,0.08);
+    color:#fff;
+    border-color: rgba(255,255,255,0.12);
 }
 
 /* MAIN */
 .main {
     flex:1;
-    background:#f9fafb;
-    padding:20px;
+    padding:28px 32px 40px 32px;
 }
 
 /* TOPBAR */
@@ -132,6 +206,25 @@ body {
     flex-wrap:wrap;
 }
 
+.hero {
+    padding: 24px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, rgba(20,20,20,0.92), rgba(16,16,16,0.6));
+    border: 1px solid var(--border);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.35);
+    margin-bottom: 22px;
+}
+.hero h1 {
+    margin: 0 0 8px 0;
+    font-family:'Playfair Display', serif;
+    font-size: 32px;
+}
+.hero p {
+    margin: 0;
+    color: var(--muted);
+    max-width: 720px;
+}
+
 .search-box {
     display:flex;
     gap:8px;
@@ -140,67 +233,125 @@ body {
 
 .search-box input {
     padding:10px;
-    border-radius:6px;
-    border:1px solid #ccc;
+    border-radius:10px;
+    border:1px solid var(--border);
+    background: rgba(20,20,20,0.9);
+    color: #f5f5f5;
 }
 
 .search-box button {
     padding:10px;
-    background:#2563eb;
+    background: #1a1a1a;
     color:white;
     border:none;
-    border-radius:6px;
+    border-radius:10px;
+}
+.filter-box select {
+    padding:10px;
+    border-radius:10px;
+    border:1px solid var(--border);
+    background: rgba(20,20,20,0.9);
+    color: #f5f5f5;
 }
 
 /* GRID */
 .products {
     display:grid;
     grid-template-columns: repeat(auto-fill,minmax(230px,1fr));
-    gap:20px;
+    gap:18px;
 }
 
 /* CARD */
 .card {
-    background:white;
-    border-radius:12px;
-    padding:15px;
-    box-shadow:0 4px 10px rgba(0,0,0,0.05);
+    background: var(--card);
+    border-radius:16px;
+    padding:16px;
+    box-shadow:0 14px 30px rgba(0,0,0,0.35);
     transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
-    border: 1px solid transparent;
+    border: 1px solid var(--border);
     cursor: pointer;
+    transform-style: preserve-3d;
+    will-change: transform;
 }
 
 .card.is-hover {
     transform: translateY(-5px);
-    box-shadow: 0 12px 26px rgba(0,0,0,0.12);
-    border-color: rgba(0,0,0,0.08);
+    box-shadow: 0 18px 36px rgba(0,0,0,0.12);
+    border-color: rgba(0,0,0,0.12);
 }
 
 .card.is-active {
     transform: translateY(-2px) scale(0.99);
-    box-shadow: 0 10px 22px rgba(0,0,0,0.18);
-    border-color: rgba(0,0,0,0.15);
+    box-shadow: 0 14px 28px rgba(0,0,0,0.16);
+    border-color: rgba(0,0,0,0.18);
 }
 
 .card img {
     width:100%;
     height:150px;
     object-fit:cover;
-    border-radius:8px;
+    border-radius:12px;
+    transition: transform 220ms ease;
 }
 
 .price {
     font-weight:bold;
     margin:10px 0;
+    color: var(--gold);
 }
 
 button {
     width:100%;
     padding:10px;
     border:none;
-    background:#10b981;
-    color:white;
-    border-radius:6px;
+    background: var(--gold);
+    color:#111;
+    border-radius:10px;
+    box-shadow: 0 10px 18px rgba(200,161,101,0.25);
+}
+@keyframes floaty {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-12px); }
+    100% { transform: translateY(0px); }
+}
+.card.floaty {
+    animation: floaty 5.5s ease-in-out infinite;
+}
+.card.floaty:nth-child(2n){
+    animation-duration: 6.2s;
+    animation-delay: 0.6s;
+}
+.card.floaty:nth-child(3n){
+    animation-duration: 6.8s;
+    animation-delay: 1s;
+}
+.footer {
+    margin-top: 28px;
+    padding: 24px;
+    border-radius: 18px;
+    background: rgba(18,18,18,0.9);
+    border: 1px solid var(--border);
+    box-shadow: 0 16px 32px rgba(0,0,0,0.35);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+}
+.footer h4 {
+    margin: 0 0 8px 0;
+    font-family:'Playfair Display', serif;
+}
+.footer a {
+    color: rgba(255,255,255,0.7);
+    text-decoration: none;
+    display: inline-block;
+    margin: 4px 0;
+}
+.footer a:hover {
+    color: var(--gold-dark);
+}
+.footer .brand {
+    color: rgba(255,255,255,0.7);
+    font-size: 13px;
 }
 .modal-backdrop {
     position: fixed;
@@ -255,9 +406,8 @@ button {
     <h2>🛒 MyShop</h2>
 
     <a href="index.php">Dashboard</a>
-    <a href="?category=Electronics">Electronics</a>
-    <a href="?category=Fashion">Fashion</a>
-    <a href="?category=Kids">Kids</a>
+    <a href="index.php">Products</a>
+    <a href="#quick-order">Place Order</a>
 
     <hr>
 
@@ -277,9 +427,24 @@ button {
     <h2><?= $category ?: "All Products" ?></h2>
 
     <form method="GET" class="search-box">
+        <div class="filter-box">
+            <select name="category">
+                <option value="">All Products</option>
+                <?php foreach($categoryOptions as $cat): ?>
+                    <option value="<?= htmlspecialchars($cat) ?>" <?= $category === $cat ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($cat) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
         <input type="text" name="search" placeholder="Search..." value="<?= $search ?>">
         <button>Search</button>
     </form>
+</div>
+
+<div class="hero">
+    <h1>Crafted Goods, Curated Inventory</h1>
+    <p>Explore your catalog with a refined view—filter by product type, search fast, and move items to the cart with intention.</p>
 </div>
 
 <div class="products">
@@ -302,6 +467,33 @@ button {
 
 </div>
 
+<div class="footer">
+    <div>
+        <h4>Contact</h4>
+        <div class="brand">Email: support@myshop.com</div>
+        <div class="brand">Phone: +254 700 000 000</div>
+        <div class="brand">Nairobi, Kenya</div>
+    </div>
+    <div>
+        <h4>Shop</h4>
+        <a href="index.php">Products</a><br>
+        <a href="cart.php">Cart</a><br>
+        <a href="orders.php">Orders</a>
+    </div>
+    <div>
+        <h4>Company</h4>
+        <a href="#">About</a><br>
+        <a href="#">Sourcing</a><br>
+        <a href="#">Careers</a>
+    </div>
+    <div>
+        <h4>Legal</h4>
+        <a href="#">Privacy Policy</a><br>
+        <a href="#">Terms</a><br>
+        <a href="#">Returns</a>
+    </div>
+</div>
+
 </div>
 
 <div class="modal-backdrop" id="cartModal">
@@ -319,16 +511,42 @@ button {
 (() => {
     const cards = document.querySelectorAll('.card');
     cards.forEach((card) => {
+        card.classList.add('floaty');
+        let raf = null;
+        const onMove = (e) => {
+            if(raf) return;
+            raf = requestAnimationFrame(() => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const midX = rect.width / 2;
+                const midY = rect.height / 2;
+                const rotateX = ((y - midY) / midY) * -12;
+                const rotateY = ((x - midX) / midX) * 12;
+                card.style.transform = `translateY(-8px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+                const img = card.querySelector('img');
+                if(img){
+                    img.style.transform = `translateY(-4px) scale(1.05)`;
+                }
+                raf = null;
+            });
+        };
         card.addEventListener('mouseenter', () => {
             card.classList.add('is-hover');
         });
         card.addEventListener('mouseleave', () => {
             card.classList.remove('is-hover');
+            card.style.transform = '';
+            const img = card.querySelector('img');
+            if(img){
+                img.style.transform = '';
+            }
         });
         card.addEventListener('click', (e) => {
             if (e.target.closest('button')) return;
             card.classList.toggle('is-active');
         });
+        card.addEventListener('mousemove', onMove);
     });
 
     const showNotice = <?= $show_notice ? 'true' : 'false' ?>;

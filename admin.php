@@ -51,8 +51,113 @@ if(isset($_POST['add'])){
     $stmt->execute();
 }
 
+// ADD USER
+$user_notice = '';
+$user_error = '';
+$userCols = [];
+$userColResult = $conn->query("SHOW COLUMNS FROM users");
+if($userColResult){
+    while($row = $userColResult->fetch_assoc()){
+        $userCols[] = $row['Field'];
+    }
+}
+$hasUserRole = in_array('role', $userCols);
+
+if(isset($_POST['add_user'])){
+    $uname = trim($_POST['user_name'] ?? '');
+    $uemail = trim($_POST['user_email'] ?? '');
+    $upass = $_POST['user_password'] ?? '';
+    $urole = $_POST['user_role'] ?? 'user';
+
+    if($uname === '' || $uemail === '' || $upass === ''){
+        $user_error = 'All user fields are required.';
+    } else {
+        $hashed = password_hash($upass, PASSWORD_DEFAULT);
+        if($hasUserRole){
+            $stmt = $conn->prepare("INSERT INTO users (name, email, password, role) VALUES (?,?,?,?)");
+            $stmt->bind_param("ssss", $uname, $uemail, $hashed, $urole);
+        } else {
+            $stmt = $conn->prepare("INSERT INTO users (name, email, password) VALUES (?,?,?)");
+            $stmt->bind_param("sss", $uname, $uemail, $hashed);
+        }
+        if($stmt->execute()){
+            $user_notice = 'User added successfully.';
+        } else {
+            $user_error = 'Failed to add user: ' . $conn->error;
+        }
+    }
+}
+
+// QUICK SEED PRODUCTS
+if(isset($_POST['seed_products'])){
+    $tableCheck = $conn->query("SHOW TABLES LIKE 'products'");
+    if(!$tableCheck || $tableCheck->num_rows === 0){
+        header("Location: admin.php?seeded=0&seed_error=missing_products_table");
+        exit();
+    }
+    // Ensure products.id is AUTO_INCREMENT to avoid duplicate primary key errors
+    $idCol = $conn->query("SHOW COLUMNS FROM products LIKE 'id'");
+    if($idCol && $idCol->num_rows > 0){
+        $idInfo = $idCol->fetch_assoc();
+        $extra = strtolower($idInfo['Extra'] ?? '');
+        if(strpos($extra, 'auto_increment') === false){
+            $fix = $conn->query("ALTER TABLE products MODIFY id INT(11) NOT NULL AUTO_INCREMENT");
+            if(!$fix){
+                header("Location: admin.php?seeded=0&seed_error=auto_increment_fix_failed");
+                exit();
+            }
+        }
+    }
+
+    $seed = [
+        ['Smartphone X', 35000, 'Electronics', 'phone.jpg'],
+        ['Noise-Cancel Headphones', 12000, 'Electronics', 'headphones.jpg'],
+        ['Ultrabook Pro', 75000, 'Electronics', 'laptop.jpg'],
+        ['Kids Tablet', 18000, 'Kids', 'phone.jpg'],
+        ['Wireless Earbuds', 8500, 'Electronics', 'headphones.jpg'],
+        ['Gaming Laptop', 95000, 'Electronics', 'laptop.jpg'],
+        ['Kids Smart Watch', 6000, 'Kids', 'phone.jpg'],
+        ['Casual Sneakers', 4500, 'Fashion', 'headphones.jpg'],
+        ['Fashion Backpack', 3800, 'Fashion', 'laptop.jpg'],
+    ];
+
+    $existingNames = [];
+    $nameResult = $conn->query("SELECT name FROM products");
+    if($nameResult){
+        while($nrow = $nameResult->fetch_assoc()){
+            $existingNames[strtolower($nrow['name'])] = true;
+        }
+    }
+
+    $stmt = $conn->prepare("INSERT INTO products (name, price, category, image) VALUES (?,?,?,?)");
+    foreach($seed as $p){
+        $pname = $p[0];
+        if(isset($existingNames[strtolower($pname)])){
+            continue;
+        }
+        $pprice = $p[1];
+        $pcat = $p[2];
+        $pimg = $p[3];
+        $stmt->bind_param("sdss", $pname, $pprice, $pcat, $pimg);
+        $stmt->execute();
+    }
+    header("Location: admin.php?seeded=1");
+    exit();
+}
+
 // FETCH PRODUCTS
+$products_error = '';
+$products_count = 0;
 $result = $conn->query("SELECT * FROM products");
+if(!$result){
+    $products_error = $conn->error;
+} else {
+    $products_count = $result->num_rows;
+}
+
+// PRODUCTS + USERS FOR ADMIN ORDER
+$products_for_order = $conn->query("SELECT id, name, price FROM products ORDER BY name");
+$users_list = $conn->query("SELECT id, name, email" . ($hasUserRole ? ", role" : "") . " FROM users ORDER BY id DESC");
 
 // ===== INSIGHTS (LOCAL ONLY) =====
 $openai_key = '';
@@ -111,7 +216,86 @@ $hasName = in_array('name', $orderCols);
 $hasQty = in_array('quantity', $orderCols);
 $hasPrice = in_array('price', $orderCols);
 $hasUserId = in_array('user_id', $orderCols);
+$hasCustomerName = in_array('customer_name', $orderCols);
 $hasCreatedAt = in_array('created_at', $orderCols);
+
+$order_notice = '';
+$order_error = '';
+if(isset($_POST['admin_place_order'])){
+    $order_user_id = (int)($_POST['order_user'] ?? 0);
+    $order_product_id = (int)($_POST['order_product'] ?? 0);
+    $order_qty = (int)($_POST['order_qty'] ?? 1);
+    if($order_qty < 1) $order_qty = 1;
+
+    $uStmt = $conn->prepare("SELECT id, name FROM users WHERE id=?");
+    $uStmt->bind_param("i", $order_user_id);
+    $uStmt->execute();
+    $uRes = $uStmt->get_result();
+    $userRow = $uRes ? $uRes->fetch_assoc() : null;
+
+    $pStmt = $conn->prepare("SELECT id, name, price FROM products WHERE id=?");
+    $pStmt->bind_param("i", $order_product_id);
+    $pStmt->execute();
+    $pRes = $pStmt->get_result();
+    $prodRow = $pRes ? $pRes->fetch_assoc() : null;
+
+    if(!$userRow || !$prodRow){
+        $order_error = "Please select a valid user and product.";
+    } else {
+        $pname = $prodRow['name'];
+        $pprice = (float)$prodRow['price'];
+        $uname = $userRow['name'];
+
+        $placed = false;
+        if($hasPrice && $hasQty && ($hasProdName || $hasName)){
+            $nameCol = $hasProdName ? 'product_name' : 'name';
+            $colsSql = "$nameCol, price, quantity";
+            $types = "sdi";
+            $values = [$pname, $pprice, $order_qty];
+            if($hasUserId){
+                $colsSql .= ", user_id";
+                $types .= "i";
+                $values[] = $order_user_id;
+            }
+            if($hasCustomerName){
+                $colsSql .= ", customer_name";
+                $types .= "s";
+                $values[] = $uname;
+            }
+            $placeholders = rtrim(str_repeat("?,", strlen($types)), ",");
+            $stmt = $conn->prepare("INSERT INTO orders ($colsSql) VALUES ($placeholders)");
+            $stmt->bind_param($types, ...$values);
+            $placed = $stmt->execute();
+        } else {
+            $total = $pprice * $order_qty;
+            $insertCols = ["total"];
+            $types = "d";
+            $values = [$total];
+            if($hasCustomerName){
+                $insertCols[] = "customer_name";
+                $types .= "s";
+                $values[] = $uname;
+            }
+            if($hasUserId){
+                $insertCols[] = "user_id";
+                $types .= "i";
+                $values[] = $order_user_id;
+            }
+            if(in_array('total', $orderCols)){
+                $placeholders = rtrim(str_repeat("?,", count($insertCols)), ",");
+                $stmt = $conn->prepare("INSERT INTO orders (" . implode(",", $insertCols) . ") VALUES ($placeholders)");
+                $stmt->bind_param($types, ...$values);
+                $placed = $stmt->execute();
+            }
+        }
+
+        if($placed){
+            $order_notice = "Order placed for {$uname}.";
+        } else {
+            $order_error = "Orders table schema not supported for admin order.";
+        }
+    }
+}
 
 $topProducts = [];
 if(($hasProdName || $hasName) && $hasQty){
@@ -160,6 +344,9 @@ if(isset($_POST['upgrade_orders_schema'])){
         }
     }
 }
+
+// Seed notice
+$seed_notice = '';
 
 // Local insights only
 $local_insight = build_local_insights($users, $orders, $revenue, $topProducts);
@@ -397,6 +584,26 @@ canvas {
 
 <h2>Add Product</h2>
 
+<?php if(isset($_GET['seeded'])): ?>
+    <?php if($_GET['seeded'] == '1'): ?>
+        <p style="color:#065f46;background:#ecfdf3;border:1px solid #a7f3d0;padding:8px 10px;border-radius:8px;">
+            Sample products added. Refresh to see them in the list.
+        </p>
+    <?php else: ?>
+        <?php $seedError = $_GET['seed_error'] ?? 'unknown'; ?>
+        <p style="color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;padding:8px 10px;border-radius:8px;">
+            Seed failed:
+            <?php if($seedError === 'missing_products_table'): ?>
+                the <code>products</code> table is missing in your database.
+            <?php elseif($seedError === 'auto_increment_fix_failed'): ?>
+                failed to enable auto-increment on <code>products.id</code>.
+            <?php else: ?>
+                unknown error.
+            <?php endif; ?>
+        </p>
+    <?php endif; ?>
+<?php endif; ?>
+
 <form method="POST" enctype="multipart/form-data">
 <input type="text" name="name" placeholder="Product name" required>
 <input type="number" name="price" placeholder="Price" required>
@@ -405,9 +612,106 @@ canvas {
 <button name="add">Add Product</button>
 </form>
 
+<form method="POST" style="margin-top:10px;">
+    <button name="seed_products">Quick Add Sample Products</button>
+    <small style="display:block;margin-top:6px;color:#4b5563;">
+        Uses existing images (phone, laptop, headphones) for quick demo items.
+    </small>
+</form>
+
+<hr>
+
+<h2>Users</h2>
+
+<?php if($user_notice): ?>
+    <p style="color:#065f46;background:#ecfdf3;border:1px solid #a7f3d0;padding:8px 10px;border-radius:8px;">
+        <?= htmlspecialchars($user_notice) ?>
+    </p>
+<?php endif; ?>
+<?php if($user_error): ?>
+    <p style="color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;padding:8px 10px;border-radius:8px;">
+        <?= htmlspecialchars($user_error) ?>
+    </p>
+<?php endif; ?>
+
+<form method="POST">
+    <input type="text" name="user_name" placeholder="Full name" required>
+    <input type="email" name="user_email" placeholder="Email" required>
+    <input type="password" name="user_password" placeholder="Password" required>
+    <?php if($hasUserRole): ?>
+        <input type="text" name="user_role" placeholder="Role (user/admin)" value="user">
+    <?php endif; ?>
+    <button name="add_user">Add User</button>
+</form>
+
+<h3 style="margin-top:16px;">Place Order for a User</h3>
+<?php if($order_notice): ?>
+    <p style="color:#065f46;background:#ecfdf3;border:1px solid #a7f3d0;padding:8px 10px;border-radius:8px;">
+        <?= htmlspecialchars($order_notice) ?>
+    </p>
+<?php endif; ?>
+<?php if($order_error): ?>
+    <p style="color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;padding:8px 10px;border-radius:8px;">
+        <?= htmlspecialchars($order_error) ?>
+    </p>
+<?php endif; ?>
+
+<form method="POST">
+    <select name="order_user" required style="padding:10px;margin:5px;border-radius:10px;border:1px solid rgba(0,0,0,0.1);">
+        <option value="">Select user</option>
+        <?php if($users_list): ?>
+            <?php while($u = $users_list->fetch_assoc()): ?>
+                <option value="<?= $u['id'] ?>"><?= htmlspecialchars($u['name']) ?> (<?= htmlspecialchars($u['email']) ?>)</option>
+            <?php endwhile; ?>
+        <?php endif; ?>
+    </select>
+    <select name="order_product" required style="padding:10px;margin:5px;border-radius:10px;border:1px solid rgba(0,0,0,0.1);">
+        <option value="">Select product</option>
+        <?php if($products_for_order): ?>
+            <?php while($p = $products_for_order->fetch_assoc()): ?>
+                <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['name']) ?> (KES <?= $p['price'] ?>)</option>
+            <?php endwhile; ?>
+        <?php endif; ?>
+    </select>
+    <input type="number" name="order_qty" placeholder="Qty" value="1" min="1" required>
+    <button name="admin_place_order">Place Order</button>
+</form>
+
+<h3 style="margin-top:16px;">Existing Users</h3>
+<table>
+<tr>
+    <th>ID</th>
+    <th>Name</th>
+    <th>Email</th>
+    <?php if($hasUserRole): ?><th>Role</th><?php endif; ?>
+</tr>
+<?php
+$users_table = $conn->query("SELECT id, name, email" . ($hasUserRole ? ", role" : "") . " FROM users ORDER BY id DESC");
+if($users_table):
+while($u = $users_table->fetch_assoc()):
+?>
+<tr>
+    <td><?= $u['id'] ?></td>
+    <td><?= htmlspecialchars($u['name']) ?></td>
+    <td><?= htmlspecialchars($u['email']) ?></td>
+    <?php if($hasUserRole): ?><td><?= htmlspecialchars($u['role']) ?></td><?php endif; ?>
+</tr>
+<?php endwhile; endif; ?>
+</table>
+
 <hr>
 
 <h2>Manage Products</h2>
+
+<?php if($products_error): ?>
+    <p style="color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;padding:8px 10px;border-radius:8px;">
+        Products query failed: <?= htmlspecialchars($products_error) ?>
+    </p>
+<?php endif; ?>
+
+<?php if(!$products_error): ?>
+    <p style="color:#4b5563;margin-top:0;">Total products: <?= $products_count ?></p>
+<?php endif; ?>
 
 <table>
 <tr>
@@ -417,17 +721,19 @@ canvas {
 <th>Action</th>
 </tr>
 
-<?php while($row=$result->fetch_assoc()): ?>
-<tr>
-<td><?= $row['name'] ?></td>
-<td><?= $row['price'] ?></td>
-<td><?= $row['category'] ?></td>
-<td>
-<a href="edit.php?id=<?= $row['id'] ?>">Edit</a> |
-<a href="admin.php?delete=<?= $row['id'] ?>">Delete</a>
-</td>
-</tr>
-<?php endwhile; ?>
+<?php if($result): ?>
+    <?php while($row=$result->fetch_assoc()): ?>
+    <tr>
+    <td><?= $row['name'] ?></td>
+    <td><?= $row['price'] ?></td>
+    <td><?= $row['category'] ?></td>
+    <td>
+    <a href="edit.php?id=<?= $row['id'] ?>">Edit</a> |
+    <a href="admin.php?delete=<?= $row['id'] ?>">Delete</a>
+    </td>
+    </tr>
+    <?php endwhile; ?>
+<?php endif; ?>
 
 </table>
 
